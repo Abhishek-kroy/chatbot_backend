@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
-const serviceAccount = require('./yt-tutorial-3fe8e-firebase-adminsdk-fbsvc-f4a519ae42.json');
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 // ✅ Prevent re-initialization
 if (!admin.apps.length) {
