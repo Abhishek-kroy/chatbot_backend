@@ -1,5 +1,5 @@
 const express = require('express');
-const {getAllSessions, getSessionById, deleteSession} = require('../controllers/dbController.js');
+const {getAllSessions, getSessionById, deleteSession} = require('../controllers/DbController.js');
 const router = express.Router();
 
 
