@@ -1,11 +1,6 @@
 const fs = require('fs');
-const path = require('path');
 const multer = require('multer');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-
-ffmpeg.setFfmpegPath(ffmpegPath);
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -13,61 +8,51 @@ const transcribeAudio = [
   upload.single('audio'),
 
   async (req, res) => {
-    const originalPath = req.file?.path;
-    const webmPath = `${originalPath}.webm`;
-    const mp3Path = `${originalPath}.mp3`;
+    console.log('🎤 API HIT - .mp3 upload received');
 
-    if (!originalPath) {
+    const filePath = req.file?.path;
+
+    if (!filePath) {
+      console.error('❌ No file uploaded');
       return res.status(400).json({ error: 'No audio file uploaded' });
     }
 
     try {
-      // Rename file to .webm
-      fs.renameSync(originalPath, webmPath);
+      const audioData = fs.readFileSync(filePath);
 
-      // Convert to .mp3 using ffmpeg
-      await new Promise((resolve, reject) => {
-        ffmpeg(webmPath)
-          .output(mp3Path)
-          .on('end', resolve)
-          .on('error', reject)
-          .run();
-      });
-
-      const audioData = fs.readFileSync(mp3Path);
-
-      // Call HuggingFace Whisper
+      // Send to HuggingFace Whisper
       const response = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${process.env.HF_TOKEN}`,
-          'Content-Type': 'audio/mpeg',
+          'Content-Type': 'audio/mpeg', // for .mp3 files
         },
         body: audioData,
       });
 
-      const text = await response.text();
+      console.log('📡 HuggingFace response status:', response.status);
 
-      // Try parsing JSON (safe fallback)
+      const text = await response.text();
       let result;
+
       try {
         result = JSON.parse(text);
       } catch (parseErr) {
-        console.error('❌ Invalid JSON response:\n', text);
-        throw new Error('HuggingFace returned invalid JSON');
+        console.error('❌ Failed to parse Whisper JSON:\n', text);
+        throw new Error('Invalid Whisper JSON response');
       }
 
-      // Cleanup temp files
-      fs.unlinkSync(webmPath);
-      fs.unlinkSync(mp3Path);
+      fs.unlinkSync(filePath); // Clean up
 
       if (!result.text) {
+        console.warn('⚠️ Whisper did not detect any speech');
         return res.status(400).json({ error: 'No speech detected or Whisper failed' });
       }
 
+      console.log('✅ Transcription result:', result.text);
       return res.json({ prompt: result.text.trim() });
     } catch (err) {
-      console.error('❌ Error during transcription:', err);
+      console.error('❌ Transcription error:', err);
       return res.status(500).json({ error: 'Transcription failed', details: err.message });
     }
   }
