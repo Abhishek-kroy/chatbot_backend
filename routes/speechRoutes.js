@@ -1,5 +1,4 @@
 const express = require('express');
-const multer = require('multer');
 const { transcribeAudio } = require('../controllers/speechController.js');
 
 const router = express.Router();

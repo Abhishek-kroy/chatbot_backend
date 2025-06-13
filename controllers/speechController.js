@@ -1,56 +1,53 @@
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const transcribeAudio = async (req, res) => {
-  console.log('🎤 API HIT - Streaming .mp3 upload');
+  console.log('🎤 API HIT - Streaming .webm upload');
 
   try {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
+    const audioBuffer = req.body; // already buffered by express.raw()
+    if (!audioBuffer || audioBuffer.length === 0) {
+      console.warn('⚠️ No audio data received');
+      return res.status(400).json({ error: 'Empty audio stream' });
+    }
 
-    req.on('end', async () => {
-      const audioBuffer = Buffer.concat(chunks);
+    console.log('📦 Received audio buffer length:', audioBuffer.length);
 
-      // Send directly to HuggingFace Whisper
-      console.log('Here');
-      const response = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.HF_TOKEN}`,
-          'Content-Type': 'audio/webm',  // <-- Important
-        },
-        body: audioBuffer,
-      });
-
-      console.log('📡 HuggingFace response status:', response.status);
-      const text = await response.text();
-
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (parseErr) {
-        console.error('❌ Invalid JSON response:\n', text);
-        return res.status(500).json({ error: 'Invalid JSON from Whisper' });
-      }
-
-      if (!result.text) {
-        console.warn('⚠️ No speech detected');
-        return res.status(400).json({ error: 'No speech detected or Whisper failed' });
-      }
-
-      console.log('✅ Transcription result:', result.text);
-      return res.json({ prompt: result.text.trim() });
+    const response = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.HF_TOKEN}`,
+        'Content-Type': 'audio/webm',  // must match actual format
+      },
+      body: audioBuffer,
     });
 
-    req.on('error', (err) => {
-      console.error('❌ Stream error:', err);
-      res.status(500).json({ error: 'Audio stream error' });
-    });
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('❌ Whisper API error:', errText);
+      return res.status(500).json({ error: 'Whisper API failed', details: errText });
+    }
+
+    const text = await response.text();
+
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (err) {
+      console.error('❌ Failed to parse Whisper JSON:', text);
+      return res.status(500).json({ error: 'Invalid JSON from Whisper' });
+    }
+
+    if (!result.text) {
+      console.warn('⚠️ No speech detected in audio');
+      return res.status(400).json({ error: 'No speech detected' });
+    }
+
+    console.log('✅ Transcribed text:', result.text);
+    return res.json({ prompt: result.text.trim() });
   } catch (err) {
-    console.error('❌ Transcription server error:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
+    console.error('❌ Transcription error:', err);
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 };
 
-module.exports = {
-  transcribeAudio,
-};
+module.exports = { transcribeAudio };
