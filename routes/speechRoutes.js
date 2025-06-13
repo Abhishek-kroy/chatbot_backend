@@ -3,8 +3,7 @@ const multer = require('multer');
 const { transcribeAudio } = require('../controllers/speechController.js');
 
 const router = express.Router();
-const upload = multer({ dest: 'uploads/' });
 
-router.post('/talk', transcribeAudio);
+router.post('/talk',  express.raw({ type: 'audio/mpeg', limit: '10mb' }),transcribeAudio);
 
 module.exports = router;
