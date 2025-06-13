@@ -22,8 +22,10 @@ const transcribeAudio = [
     }
 
     try {
-      fs.renameSync(originalPath, webmPath); // Fix extension
+      // Rename file to .webm
+      fs.renameSync(originalPath, webmPath);
 
+      // Convert to .mp3 using ffmpeg
       await new Promise((resolve, reject) => {
         ffmpeg(webmPath)
           .output(mp3Path)
@@ -34,7 +36,8 @@ const transcribeAudio = [
 
       const audioData = fs.readFileSync(mp3Path);
 
-      const response = await fetch('https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3', {
+      // Call HuggingFace Whisper
+      const response = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${process.env.HF_TOKEN}`,
@@ -43,8 +46,18 @@ const transcribeAudio = [
         body: audioData,
       });
 
-      const result = await response.json();
+      const text = await response.text();
 
+      // Try parsing JSON (safe fallback)
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (parseErr) {
+        console.error('❌ Invalid JSON response:\n', text);
+        throw new Error('HuggingFace returned invalid JSON');
+      }
+
+      // Cleanup temp files
       fs.unlinkSync(webmPath);
       fs.unlinkSync(mp3Path);
 
@@ -54,7 +67,7 @@ const transcribeAudio = [
 
       return res.json({ prompt: result.text.trim() });
     } catch (err) {
-      console.error('Error during transcription:', err);
+      console.error('❌ Error during transcription:', err);
       return res.status(500).json({ error: 'Transcription failed', details: err.message });
     }
   }
