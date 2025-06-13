@@ -4,19 +4,19 @@ const transcribeAudio = async (req, res) => {
   console.log('🎤 API HIT - Streaming .mp3 upload');
 
   try {
-    // Collect incoming stream into a buffer
     const chunks = [];
     req.on('data', (chunk) => chunks.push(chunk));
-    
+
     req.on('end', async () => {
       const audioBuffer = Buffer.concat(chunks);
 
       // Send directly to HuggingFace Whisper
+      console.log('Here');
       const response = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${process.env.HF_TOKEN}`,
-          'Content-Type': 'audio/mpeg',
+          'Content-Type': 'audio/webm',  // <-- Important
         },
         body: audioBuffer,
       });
