@@ -10,11 +10,10 @@ const YT_API_KEY = process.env.YT_API_KEY;
 const CHANNEL_ID = "UC-QLxQ7cFp-3CFnSZO6oXXw";
 
 const db = admin.firestore();
-const tts = gTTS('en'); // English voice
+const tts = gTTS('en');
 
-// ============================
-// ✅ Text-to-Speech Route
-// ============================
+
+
 const speakText = async (req, res) => {
   try {
     const { text } = req.body;

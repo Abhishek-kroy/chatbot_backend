@@ -1,41 +1,64 @@
-require('dotenv').config(); // Load environment variables from .env file
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('ffmpeg-static');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
-const fs = require('fs').promises; // Use promises for async file operations
-const {SpeechClient} = require('@google-cloud/speech');
+ffmpeg.setFfmpegPath(ffmpegPath);
 
-// Ensure credentials are loaded before using the client
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.error('❌ Missing GOOGLE_APPLICATION_CREDENTIALS in .env');
-  process.exit(1);
-}
+const upload = multer({ dest: 'uploads/' });
 
-const speechClient = new SpeechClient(); // Automatically picks credentials from env var
+const transcribeAudio = [
+  upload.single('audio'),
 
-const transcribeAudio = async (req, res) => {
-  try {
-    const bytes = await fs.readFile(req.file.path);
+  async (req, res) => {
+    const originalPath = req.file?.path;
+    const webmPath = `${originalPath}.webm`;
+    const mp3Path = `${originalPath}.mp3`;
 
-    const [resp] = await speechClient.recognize({
-      audio: { content: bytes.toString('base64') },
-      config: {
-        encoding: 'LINEAR16', // make sure this matches the audio file format
-        languageCode: 'en-US',
-      },
-    });
+    if (!originalPath) {
+      return res.status(400).json({ error: 'No audio file uploaded' });
+    }
 
-    await fs.unlink(req.file.path); // delete temp file after use
+    try {
+      fs.renameSync(originalPath, webmPath); // Fix extension
 
-    const text = resp.results.map(r => r.alternatives[0].transcript).join('\n');
-    res.json({ text });
+      await new Promise((resolve, reject) => {
+        ffmpeg(webmPath)
+          .output(mp3Path)
+          .on('end', resolve)
+          .on('error', reject)
+          .run();
+      });
 
-  } catch (err) {
-    console.error('❌ Transcription failed:', err);
-    res.status(500).json({
-      error: 'Failed to transcribe audio',
-      details: err.message,
-    });
+      const audioData = fs.readFileSync(mp3Path);
+
+      const response = await fetch('https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.HF_TOKEN}`,
+          'Content-Type': 'audio/mpeg',
+        },
+        body: audioData,
+      });
+
+      const result = await response.json();
+
+      fs.unlinkSync(webmPath);
+      fs.unlinkSync(mp3Path);
+
+      if (!result.text) {
+        return res.status(400).json({ error: 'No speech detected or Whisper failed' });
+      }
+
+      return res.json({ prompt: result.text.trim() });
+    } catch (err) {
+      console.error('Error during transcription:', err);
+      return res.status(500).json({ error: 'Transcription failed', details: err.message });
+    }
   }
-};
+];
 
 module.exports = {
   transcribeAudio,
