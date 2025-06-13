@@ -1,7 +1,6 @@
 const express =  require('express');
 const cors =  require('cors');
 const dotenv =  require('dotenv');
-const speechRoutes =  require('./routes/speechRoutes.js');
 const chatRoutes =  require('./routes/chatRoutes.js');
 const authRoutes =  require('./routes/authRoutes.js');
 const dbRoutes =  require('./routes/dbRoutes.js');
@@ -12,7 +11,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api', speechRoutes);
 app.use('/api', chatRoutes);
 app.use('/api', authRoutes);
 app.use('/api', dbRoutes);
