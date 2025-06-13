@@ -12,7 +12,7 @@ const transcribeAudio = async (req, res) => {
 
     console.log('📦 Received audio buffer length:', audioBuffer.length);
 
-    const response = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
+    const response = await fetch('https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.HF_TOKEN}`,
