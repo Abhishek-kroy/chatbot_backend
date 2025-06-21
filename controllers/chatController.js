@@ -68,7 +68,7 @@ async function fetchYouTubeVideos(query) {
 
       for (const item of res.data.items) {
         const videoId = item.id.videoId;
-        if (!seen.has(videoId)) {
+        if (item.snippet.channelId === CHANNEL_ID && !seen.has(videoId)) {
           seen.add(videoId);
           results.push({
             type: 'video',
@@ -93,7 +93,7 @@ async function fetchYouTubeVideos(query) {
         },
       });
 
-      if (playlistRes.data.items.length > 0) {
+      if (playlistRes.data.items[0].snippet.channelId === CHANNEL_ID && playlistRes.data.items.length > 0) {
         const playlist = playlistRes.data.items[0];
         results.push({
           type: 'playlist',
